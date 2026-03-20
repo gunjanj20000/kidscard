@@ -92,6 +92,22 @@ const sortCategories = (items: Category[]) =>
     return (a.createdAt ?? 0) - (b.createdAt ?? 0);
   });
 
+const isQueryCompatibilityError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('query') &&
+    (
+      message.includes('attribute') ||
+      message.includes('index') ||
+      message.includes('invalid')
+    )
+  );
+};
+
 export function useFlashcardSync() {
   const storage = useOfflineStorage();
   const {
@@ -142,14 +158,33 @@ export function useFlashcardSync() {
   const listAllDocuments = useCallback(async <T extends Models.Document>(collectionId: string, userId: string) => {
     const allDocs: T[] = [];
     let cursor: string | undefined;
+    let useOwnerFilter = true;
 
     while (true) {
-      const queries = [Query.equal('ownerId', userId), Query.limit(100)];
+      const queries = [Query.limit(100)];
+      if (useOwnerFilter) {
+        queries.unshift(Query.equal('ownerId', userId));
+      }
+
       if (cursor) {
         queries.push(Query.cursorAfter(cursor));
       }
 
-      const response = await databases.listDocuments<T>(APPWRITE_DATABASE_ID, collectionId, queries);
+      let response: Models.DocumentList<T>;
+      try {
+        response = await databases.listDocuments<T>(APPWRITE_DATABASE_ID, collectionId, queries);
+      } catch (error) {
+        if (useOwnerFilter && isQueryCompatibilityError(error)) {
+          // Some Appwrite setups reject this filter when the attribute/index is missing.
+          useOwnerFilter = false;
+          allDocs.length = 0;
+          cursor = undefined;
+          continue;
+        }
+
+        throw error;
+      }
+
       allDocs.push(...response.documents);
 
       if (response.documents.length < 100) {
@@ -159,7 +194,14 @@ export function useFlashcardSync() {
       cursor = response.documents[response.documents.length - 1].$id;
     }
 
-    return allDocs;
+    if (useOwnerFilter) {
+      return allDocs;
+    }
+
+    return allDocs.filter((doc) => {
+      const ownerId = (doc as { ownerId?: unknown }).ownerId;
+      return typeof ownerId !== 'string' || ownerId === userId;
+    });
   }, []);
 
   const pullFromCloud = useCallback(async (): Promise<SyncResult> => {
