@@ -108,6 +108,17 @@ const isQueryCompatibilityError = (error: unknown): boolean => {
   );
 };
 
+const UNKNOWN_ATTRIBUTE_REGEX = /Unknown attribute:\s*"([^"]+)"/i;
+
+const getUnknownAttribute = (error: unknown): string | null => {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+
+  const match = error.message.match(UNKNOWN_ATTRIBUTE_REGEX);
+  return match?.[1] ?? null;
+};
+
 export function useFlashcardSync() {
   const storage = useOfflineStorage();
   const {
@@ -303,9 +314,58 @@ export function useFlashcardSync() {
       const localCardIds = new Set(effectiveLocalCards.map((card) => card.id));
       const localCategoryIds = new Set(localCategories.map((category) => category.id));
 
+      const upsertDocumentWithSchemaFallback = async (
+        collectionId: string,
+        documentId: string,
+        basePayload: Record<string, unknown>
+      ) => {
+        let payload: Record<string, unknown> = { ...basePayload };
+
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          try {
+            await databases.updateDocument(
+              APPWRITE_DATABASE_ID,
+              collectionId,
+              documentId,
+              payload
+            );
+            return;
+          } catch (updateError) {
+            const updateUnknownAttribute = getUnknownAttribute(updateError);
+            if (updateUnknownAttribute && updateUnknownAttribute in payload) {
+              const { [updateUnknownAttribute]: _removed, ...nextPayload } = payload;
+              payload = nextPayload;
+              continue;
+            }
+
+            try {
+              await databases.createDocument(
+                APPWRITE_DATABASE_ID,
+                collectionId,
+                documentId,
+                payload,
+                permissions
+              );
+              return;
+            } catch (createError) {
+              const createUnknownAttribute = getUnknownAttribute(createError);
+              if (createUnknownAttribute && createUnknownAttribute in payload) {
+                const { [createUnknownAttribute]: _removed, ...nextPayload } = payload;
+                payload = nextPayload;
+                continue;
+              }
+
+              throw createError;
+            }
+          }
+        }
+
+        throw new Error('Failed to sync document due to incompatible Appwrite schema.');
+      };
+
       await Promise.all(localCategories.map(async (category) => {
         const payload = {
-          ownerId: currentUser.$id,
+          isActive: true,
           name: category.name,
           icon: category.icon,
           color: category.color,
@@ -314,27 +374,16 @@ export function useFlashcardSync() {
           updatedAt: Date.now(),
         };
 
-        try {
-          await databases.updateDocument(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_CATEGORIES_COLLECTION_ID,
-            category.id,
-            payload
-          );
-        } catch {
-          await databases.createDocument(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_CATEGORIES_COLLECTION_ID,
-            category.id,
-            payload,
-            permissions
-          );
-        }
+        await upsertDocumentWithSchemaFallback(
+          APPWRITE_CATEGORIES_COLLECTION_ID,
+          category.id,
+          payload
+        );
       }));
 
       await Promise.all(effectiveLocalCards.map(async (card) => {
         const payload = {
-          ownerId: currentUser.$id,
+          isActive: true,
           word: card.word,
           imageUrl: card.imageUrl,
           categoryId: card.categoryId,
@@ -342,22 +391,11 @@ export function useFlashcardSync() {
           updatedAt: Date.now(),
         };
 
-        try {
-          await databases.updateDocument(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_CARDS_COLLECTION_ID,
-            card.id,
-            payload
-          );
-        } catch {
-          await databases.createDocument(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_CARDS_COLLECTION_ID,
-            card.id,
-            payload,
-            permissions
-          );
-        }
+        await upsertDocumentWithSchemaFallback(
+          APPWRITE_CARDS_COLLECTION_ID,
+          card.id,
+          payload
+        );
       }));
 
       await Promise.all(remoteCardDocs
