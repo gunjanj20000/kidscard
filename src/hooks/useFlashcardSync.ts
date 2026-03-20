@@ -94,6 +94,15 @@ const sortCategories = (items: Category[]) =>
 
 export function useFlashcardSync() {
   const storage = useOfflineStorage();
+  const {
+    getPendingCards,
+    getPendingCategories,
+    saveAllCategories,
+    saveAllCards,
+    getAllCards,
+    getAllCategories,
+    saveImage,
+  } = storage;
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({
     lastSyncedAt: null,
@@ -104,13 +113,20 @@ export function useFlashcardSync() {
   const realtimePullTimer = useRef<number | null>(null);
 
   const updatePendingCount = useCallback(async () => {
-    const pendingCards = await storage.getPendingCards();
-    const pendingCategories = await storage.getPendingCategories();
-    setSyncState((prev) => ({
-      ...prev,
-      pendingChanges: pendingCards.length + pendingCategories.length,
-    }));
-  }, [storage]);
+    const pendingCards = await getPendingCards();
+    const pendingCategories = await getPendingCategories();
+    const nextPendingChanges = pendingCards.length + pendingCategories.length;
+    setSyncState((prev) => {
+      if (prev.pendingChanges === nextPendingChanges) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        pendingChanges: nextPendingChanges,
+      };
+    });
+  }, [getPendingCards, getPendingCategories]);
 
   const getCurrentUser = useCallback(async () => {
     try {
@@ -168,8 +184,8 @@ export function useFlashcardSync() {
       const remoteCards = remoteCardDocs.map(mapCardDocToLocal);
 
       await Promise.all([
-        storage.saveAllCategories(remoteCategories),
-        storage.saveAllCards(remoteCards),
+        saveAllCategories(remoteCategories),
+        saveAllCards(remoteCards),
       ]);
 
       setSyncState((prev) => ({
@@ -190,7 +206,7 @@ export function useFlashcardSync() {
       setSyncState((prev) => ({ ...prev, isSyncing: false }));
       return { success: false, error: message };
     }
-  }, [getCurrentUser, listAllDocuments, storage, updatePendingCount, user]);
+  }, [getCurrentUser, listAllDocuments, saveAllCards, saveAllCategories, updatePendingCount, user]);
 
   const syncToCloud = useCallback(async (): Promise<SyncResult> => {
     if (!ENABLE_CLOUD_SYNC) {
@@ -206,8 +222,8 @@ export function useFlashcardSync() {
 
     try {
       const [localCards, localCategories, remoteCardDocs, remoteCategoryDocs] = await Promise.all([
-        storage.getAllCards(),
-        storage.getAllCategories(),
+        getAllCards(),
+        getAllCategories(),
         listAllDocuments<CloudCardDoc>(APPWRITE_CARDS_COLLECTION_ID, currentUser.$id),
         listAllDocuments<CloudCategoryDoc>(APPWRITE_CATEGORIES_COLLECTION_ID, currentUser.$id),
       ]);
@@ -238,7 +254,7 @@ export function useFlashcardSync() {
       const effectiveLocalCards = localCardsChanged ? cardsWithResolvedImageUrls : localCards;
 
       if (localCardsChanged) {
-        await storage.saveAllCards(effectiveLocalCards);
+        await saveAllCards(effectiveLocalCards);
       }
 
       const permissions = createPermissions(currentUser.$id);
@@ -326,8 +342,8 @@ export function useFlashcardSync() {
       }));
 
       await Promise.all([
-        storage.saveAllCards(syncedCards),
-        storage.saveAllCategories(syncedCategories),
+        saveAllCards(syncedCards),
+        saveAllCategories(syncedCategories),
       ]);
 
       setSyncState((prev) => ({
@@ -348,7 +364,16 @@ export function useFlashcardSync() {
       setSyncState((prev) => ({ ...prev, isSyncing: false }));
       return { success: false, error: message };
     }
-  }, [getCurrentUser, listAllDocuments, storage, updatePendingCount, user]);
+  }, [
+    getAllCards,
+    getAllCategories,
+    getCurrentUser,
+    listAllDocuments,
+    saveAllCards,
+    saveAllCategories,
+    updatePendingCount,
+    user,
+  ]);
 
   const fullSync = useCallback(async (): Promise<SyncResult> => {
     const push = await syncToCloud();
@@ -399,7 +424,7 @@ export function useFlashcardSync() {
   }, []);
 
   const uploadImage = useCallback(async (cardId: string, imageData: string): Promise<string | null> => {
-    await storage.saveImage(cardId, imageData);
+    await saveImage(cardId, imageData);
 
     if (!isDataImageUrl(imageData)) {
       return imageData;
@@ -426,7 +451,7 @@ export function useFlashcardSync() {
       console.error('Image upload failed:', error);
       return imageData;
     }
-  }, [getCurrentUser, storage, user]);
+  }, [getCurrentUser, saveImage, user]);
 
   const deleteImageFromCloud = useCallback(async (cardId: string): Promise<void> => {
     const currentUser = user ?? (await getCurrentUser());
