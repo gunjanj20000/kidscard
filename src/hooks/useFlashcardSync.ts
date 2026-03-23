@@ -52,22 +52,24 @@ const dataUrlToFile = async (dataUrl: string, fileName: string): Promise<File> =
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   
-  // Handle SVG and other MIME types properly
-  let extension = 'png';
+  // Always use .jpg for JPEG images - strict extension enforcement
+  let extension = 'png'; // Default fallback
+  
   if (blob.type === 'image/svg+xml') {
     extension = 'svg';
-  } else if (blob.type.includes('/')) {
-    extension = blob.type.split('/')[1]?.split(';')[0] || 'png';
-  }
-  
-  // Normalize jpeg to jpg for better bucket compatibility
-  if (extension === 'jpeg') {
-    extension = 'jpg';
-  }
-  
-  // Fallback to common extensions
-  if (!ALLOWED_EXTENSIONS.includes(extension)) {
+  } else if (blob.type === 'image/jpeg' || blob.type === 'image/jpg') {
+    extension = 'jpg'; // Always normalize to jpg
+  } else if (blob.type === 'image/png') {
     extension = 'png';
+  } else if (blob.type === 'image/gif') {
+    extension = 'gif';
+  } else if (blob.type === 'image/webp') {
+    extension = 'webp';
+  } else if (blob.type.includes('/')) {
+    // Fallback extraction from MIME type
+    const extracted = blob.type.split('/')[1]?.split(';')[0] || 'png';
+    // Normalize any jpeg variant to jpg
+    extension = extracted === 'jpeg' ? 'jpg' : extracted;
   }
   
   return new File([blob], `${fileName}.${extension}`, { type: blob.type || 'image/png' });
@@ -323,32 +325,36 @@ export function useFlashcardSync() {
         // Ignore if file does not exist yet.
       }
 
+      const ext = file.name.split('.').pop();
       // Log upload attempt for debugging
-      console.debug(`Uploading image: ${file.name} (${file.type}, ${Math.round(file.size / 1024)}KB)`, {
-        extension: file.name.split('.').pop(),
+      console.debug(`Uploading image: ${file.name}`, {
+        fileName: file.name,
+        extension: ext,
         mimeType: file.type,
-        size: file.size,
+        sizeKB: Math.round(file.size / 1024),
+        bucketId: APPWRITE_STORAGE_BUCKET_ID,
       });
 
       await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
       
-      console.debug(`Image uploaded successfully: ${file.name}`);
+      console.debug(`✓ Image uploaded successfully: ${file.name}`);
       return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('Image upload error response:', {
-        message: errorMsg,
+      console.error('❌ Image upload failed', {
+        error: errorMsg,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
         fullError: error,
       });
       
-      if (errorMsg.includes('extension') || errorMsg.includes('MIME')) {
-        console.error('Extension rejected by bucket. The bucket may have different allowed extensions than expected.');
+      if (errorMsg.includes('extension') || errorMsg.includes('MIME') || errorMsg.includes('File')) {
+        console.error('→ Issue: File extension rejected. Check Appwrite bucket allows: jpg, jpeg, png, svg, gif, webp');
       } else if (errorMsg.includes('permission') || errorMsg.includes('401') || errorMsg.includes('403')) {
-        console.error('Permission denied uploading to storage.');
+        console.error('→ Issue: Permission denied. User may not have storage access.');
       } else if (errorMsg.includes('quota') || errorMsg.includes('limit')) {
-        console.error('Storage quota or upload limit exceeded.');
-      } else {
-        console.error('Image upload failed:', error);
+        console.error('→ Issue: Storage quota or upload limit exceeded.');
+      } else if (errorMsg.includes('size')) {
+        console.error('→ Issue: File size exceeds limit.');
       }
       // Fall back to storing the data URL locally
       return imageData;
