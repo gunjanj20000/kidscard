@@ -134,6 +134,13 @@ const getUnknownAttribute = (error: unknown): string | null => {
   return null;
 };
 
+const isNotFoundError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.includes('404') || error.message.toLowerCase().includes('not found');
+};
+
 export function useFlashcardSync() {
   const storage = useOfflineStorage();
   const {
@@ -387,6 +394,29 @@ export function useFlashcardSync() {
             );
             return;
           } catch (updateError) {
+            // Check if document doesn't exist (404) - should trigger CREATE
+            if (isNotFoundError(updateError)) {
+              try {
+                await databases.createDocument(
+                  APPWRITE_DATABASE_ID,
+                  collectionId,
+                  documentId,
+                  payload,
+                  permissions
+                );
+                return;
+              } catch (createError) {
+                const createUnknownAttribute = getUnknownAttribute(createError);
+                if (createUnknownAttribute && createUnknownAttribute in payload) {
+                  const { [createUnknownAttribute]: _removed, ...nextPayload } = payload;
+                  payload = nextPayload;
+                  continue;
+                }
+                throw createError;
+              }
+            }
+
+            // Check for unknown attributes on UPDATE
             const updateUnknownAttribute = getUnknownAttribute(updateError);
             if (updateUnknownAttribute && updateUnknownAttribute in payload) {
               const { [updateUnknownAttribute]: _removed, ...nextPayload } = payload;
@@ -394,6 +424,7 @@ export function useFlashcardSync() {
               continue;
             }
 
+            // Any other error on UPDATE (non-404, non-unknown-attribute) - try CREATE
             try {
               await databases.createDocument(
                 APPWRITE_DATABASE_ID,
