@@ -44,13 +44,26 @@ interface CloudCategoryDoc extends Models.Document {
 
 const VALID_CATEGORY_COLORS: Category['color'][] = ['coral', 'mint', 'sky', 'lavender', 'sunshine', 'peach'];
 const DATA_URL_PREFIX = 'data:image/';
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
 
 const isDataImageUrl = (value: string) => value.startsWith(DATA_URL_PREFIX);
 
 const dataUrlToFile = async (dataUrl: string, fileName: string): Promise<File> => {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
-  const extension = blob.type.split('/')[1] || 'png';
+  
+  // Handle SVG and other MIME types properly
+  let extension = 'png';
+  if (blob.type === 'image/svg+xml') {
+    extension = 'svg';
+  } else if (blob.type.includes('/')) {
+    extension = blob.type.split('/')[1]?.split(';')[0] || 'png';
+  }
+  // Fallback to common extensions
+  if (!ALLOWED_EXTENSIONS.includes(extension)) {
+    extension = 'png';
+  }
+  
   return new File([blob], `${fileName}.${extension}`, { type: blob.type || 'image/png' });
 };
 
@@ -304,15 +317,22 @@ export function useFlashcardSync() {
         // Ignore if file does not exist yet.
       }
 
+      // Log upload attempt for debugging
+      console.debug(`Uploading image: ${file.name} (${file.type}, ${file.size} bytes)`);
+
       await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
+      
+      console.debug(`Image uploaded successfully: ${file.name}`);
       return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.includes('extension') || errorMsg.includes('MIME')) {
         console.error(
-          'Image upload blocked: Appwrite bucket may not allow this file type. Check bucket settings for allowed file extensions.',
+          'Image upload blocked: Appwrite bucket rejected file. Check bucket allows jpg, png, svg extensions.',
           error
         );
+      } else if (errorMsg.includes('permission') || errorMsg.includes('401')) {
+        console.error('Image upload failed: Permission denied. User may not have storage access.', error);
       } else {
         console.error('Image upload failed:', error);
       }
