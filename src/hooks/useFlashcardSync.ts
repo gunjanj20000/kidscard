@@ -407,6 +407,7 @@ export function useFlashcardSync() {
 
       await Promise.all(localCategories.map(async (category) => {
         const payload = {
+          ownerId: currentUser.$id,
           isActive: true,
           name: category.name,
           icon: category.icon,
@@ -425,6 +426,7 @@ export function useFlashcardSync() {
 
       await Promise.all(effectiveLocalCards.map(async (card) => {
         const payload = {
+          ownerId: currentUser.$id,
           isActive: true,
           word: card.word,
           words: card.word,
