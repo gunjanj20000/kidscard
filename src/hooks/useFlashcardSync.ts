@@ -635,10 +635,11 @@ export function useFlashcardSync() {
         window.clearTimeout(realtimePullTimer.current);
       }
 
+      // Faster debounce for realtime sync (200ms) ensures cross-device changes appear quickly
       realtimePullTimer.current = window.setTimeout(() => {
         realtimePullTimer.current = null;
         void pullFromCloud();
-      }, 350);
+      }, 200);
     });
 
     return () => {

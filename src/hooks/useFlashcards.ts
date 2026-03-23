@@ -36,7 +36,7 @@ export interface LocalBackupData {
   settings: AppSettings;
 }
 
-const SYNC_DEBOUNCE_MS = 8_000;
+const SYNC_DEBOUNCE_MS = 2_000;
 
 
 export function useFlashcards() {
@@ -117,6 +117,20 @@ export function useFlashcards() {
 
     loadData();
   }, [refreshFromStorage, storage]);
+
+  // Auto-refresh UI when cloud data is pulled (cross-device sync)
+  useEffect(() => {
+    if (!ENABLE_CLOUD_SYNC || !sync.syncState.lastSyncedAt) {
+      return;
+    }
+
+    // When cloud sync completes, refresh local state from storage
+    const timer = setTimeout(() => {
+      void refreshFromStorage();
+    }, 100); // Small delay to ensure storage updates have propagated
+
+    return () => clearTimeout(timer);
+  }, [sync.syncState.lastSyncedAt, refreshFromStorage]);
 
   const getCardsByCategory = useCallback(
     (categoryId: string) => cards.filter((card) => card.categoryId === categoryId),
