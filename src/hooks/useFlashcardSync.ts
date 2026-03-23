@@ -307,7 +307,16 @@ export function useFlashcardSync() {
       await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
       return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
     } catch (error) {
-      console.error('Image upload failed:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('extension') || errorMsg.includes('MIME')) {
+        console.error(
+          'Image upload blocked: Appwrite bucket may not allow this file type. Check bucket settings for allowed file extensions.',
+          error
+        );
+      } else {
+        console.error('Image upload failed:', error);
+      }
+      // Fall back to storing the data URL locally
       return imageData;
     }
   }, [getCurrentUser, saveImage, user]);
@@ -627,27 +636,42 @@ export function useFlashcardSync() {
       return;
     }
 
-    const unsubscribe = client.subscribe([
-      `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_CARDS_COLLECTION_ID}.documents`,
-      `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_CATEGORIES_COLLECTION_ID}.documents`,
-    ], () => {
-      if (realtimePullTimer.current !== null) {
-        window.clearTimeout(realtimePullTimer.current);
-      }
+    try {
+      const unsubscribe = client.subscribe(
+        [
+          `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_CARDS_COLLECTION_ID}.documents`,
+          `databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_CATEGORIES_COLLECTION_ID}.documents`,
+        ],
+        () => {
+          if (realtimePullTimer.current !== null) {
+            window.clearTimeout(realtimePullTimer.current);
+          }
 
-      // Faster debounce for realtime sync (200ms) ensures cross-device changes appear quickly
-      realtimePullTimer.current = window.setTimeout(() => {
-        realtimePullTimer.current = null;
-        void pullFromCloud();
-      }, 200);
-    });
+          // Faster debounce for realtime sync (200ms) ensures cross-device changes appear quickly
+          realtimePullTimer.current = window.setTimeout(() => {
+            realtimePullTimer.current = null;
+            void pullFromCloud();
+          }, 200);
+        },
+        (error) => {
+          console.warn('Realtime subscription warning:', error);
+          // Connection interrupted - fall back to periodic polling
+          if (realtimePullTimer.current !== null) {
+            window.clearTimeout(realtimePullTimer.current);
+          }
+        }
+      );
 
-    return () => {
-      if (realtimePullTimer.current !== null) {
-        window.clearTimeout(realtimePullTimer.current);
-      }
-      unsubscribe();
-    };
+      return () => {
+        if (realtimePullTimer.current !== null) {
+          window.clearTimeout(realtimePullTimer.current);
+        }
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error('Failed to establish realtime subscription:', error);
+      // Realtime connection failed - app will continue with manual sync
+    }
   }, [pullFromCloud, user]);
 
   return {
