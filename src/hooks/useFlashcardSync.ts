@@ -377,7 +377,7 @@ export function useFlashcardSync() {
       ) => {
         let payload: Record<string, unknown> = { ...basePayload };
 
-        for (let attempt = 0; attempt < 8; attempt += 1) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
           try {
             await databases.updateDocument(
               APPWRITE_DATABASE_ID,
@@ -411,20 +411,6 @@ export function useFlashcardSync() {
                 continue;
               }
 
-              // If it's still a 400 and we haven't tried stripping optional fields, try harder
-              if (createError instanceof Error && createError.message.includes('400')) {
-                // Try stripping optional fields one by one
-                const optionalFields = ['isActive', 'createdAt', 'updatedAt', 'order', 'icon'];
-                for (const field of optionalFields) {
-                  if (field in payload) {
-                    const { [field]: _removed, ...nextPayload } = payload;
-                    payload = nextPayload;
-                    attempt = attempt - 1; // Don't count this as an attempt, retry same loop
-                    continue;
-                  }
-                }
-              }
-
               throw createError;
             }
           }
@@ -440,9 +426,6 @@ export function useFlashcardSync() {
           name: category.name,
           icon: category.icon,
           color: category.color,
-          order: category.order ?? 0,
-          createdAt: category.createdAt ?? Date.now(),
-          updatedAt: Date.now(),
         };
 
         await upsertDocumentWithSchemaFallback(
@@ -455,13 +438,9 @@ export function useFlashcardSync() {
       await Promise.all(effectiveLocalCards.map(async (card) => {
         const payload = {
           ownerId: currentUser.$id,
-          isActive: true,
           word: card.word,
-          words: card.word,
-          imageUrl: card.imageUrl,
+          imageId: card.imageUrl,
           categoryId: card.categoryId,
-          createdAt: card.createdAt ?? Date.now(),
-          updatedAt: Date.now(),
         };
 
         await upsertDocumentWithSchemaFallback(
