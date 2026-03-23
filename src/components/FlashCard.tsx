@@ -190,6 +190,22 @@ export function FlashCard({ card, onSpeak, onSwipeLeft, onSwipeRight, isFirst = 
             alt={card.word}
             className="w-full h-full object-contain"
             loading="eager"
+            onError={(e) => {
+              console.error('Failed to load image for card:', {
+                cardId: card.id,
+                word: card.word,
+                imageUrl: card.imageUrl,
+                error: e,
+              });
+              // Image failed to load, will show gradient background
+            }}
+            onLoad={() => {
+              console.debug('Image loaded successfully for card:', {
+                cardId: card.id,
+                word: card.word,
+                imageUrl: card.imageUrl?.substring(0, 100),
+              });
+            }}
           />
           
           {/* Sound indicator */}

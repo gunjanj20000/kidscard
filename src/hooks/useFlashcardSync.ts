@@ -82,7 +82,12 @@ const mapCardDocToLocal = (doc: CloudCardDoc): Flashcard => {
   
   // If imageUrl looks like a file ID (not a URL and not a data URL), convert it to preview URL
   if (displayImageUrl && !displayImageUrl.startsWith('http') && !displayImageUrl.startsWith('data:')) {
-    displayImageUrl = getImagePreviewUrl(displayImageUrl);
+    const previewUrl = getImagePreviewUrl(displayImageUrl);
+    console.debug('Converting file ID to preview URL:', {
+      fileId: displayImageUrl,
+      previewUrl: previewUrl.substring(0, 100),
+    });
+    displayImageUrl = previewUrl;
   }
   
   return {

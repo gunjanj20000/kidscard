@@ -16,11 +16,13 @@ const databases = new Databases(client);
 const storage = new Storage(client);
 
 /**
- * Convert a file ID to its preview URL
+ * Convert a file ID to its view/preview URL
  * Used for displaying images that are stored in Appwrite buckets
  */
 const getImagePreviewUrl = (fileId: string): string => {
-  return `${APPWRITE_ENDPOINT}/storage/buckets/${APPWRITE_STORAGE_BUCKET_ID}/files/${fileId}/preview`;
+  // Use the view endpoint which works for images
+  // Format: /v1/storage/buckets/{bucketId}/files/{fileId}/view
+  return `${APPWRITE_ENDPOINT}/storage/buckets/${APPWRITE_STORAGE_BUCKET_ID}/files/${fileId}/view?project=${APPWRITE_PROJECT_ID}`;
 };
 
 export {
