@@ -25,6 +25,7 @@ interface SyncResult {
 interface CloudCardDoc extends Models.Document {
   ownerId: string;
   word: string;
+  words?: string;
   imageUrl: string;
   categoryId: string;
   createdAt: number;
@@ -55,7 +56,7 @@ const dataUrlToFile = async (dataUrl: string, fileName: string): Promise<File> =
 
 const mapCardDocToLocal = (doc: CloudCardDoc): Flashcard => ({
   id: doc.$id,
-  word: String(doc.word ?? ''),
+  word: String(doc.word ?? doc.words ?? ''),
   imageUrl: String(doc.imageUrl ?? ''),
   categoryId: String(doc.categoryId ?? ''),
   createdAt: typeof doc.createdAt === 'number' ? doc.createdAt : Date.now(),
@@ -260,7 +261,48 @@ export function useFlashcardSync() {
       return { success: false, error: message };
     }
   }, [getCurrentUser, listAllDocuments, saveAllCards, saveAllCategories, updatePendingCount, user]);
+  const uploadImage = useCallback(async (cardId: string, imageData: string): Promise<string | null> => {
+    await saveImage(cardId, imageData);
 
+    if (!isDataImageUrl(imageData)) {
+      return imageData;
+    }
+
+    const currentUser = user ?? (await getCurrentUser());
+    if (!currentUser) {
+      return imageData;
+    }
+
+    try {
+      const file = await dataUrlToFile(imageData, cardId);
+      const permissions = createPermissions(currentUser.$id);
+
+      try {
+        await appwriteStorage.deleteFile(APPWRITE_STORAGE_BUCKET_ID, cardId);
+      } catch {
+        // Ignore if file does not exist yet.
+      }
+
+      await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
+      return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      return imageData;
+    }
+  }, [getCurrentUser, saveImage, user]);
+
+  const deleteImageFromCloud = useCallback(async (cardId: string): Promise<void> => {
+    const currentUser = user ?? (await getCurrentUser());
+    if (!currentUser) {
+      return;
+    }
+
+    try {
+      await appwriteStorage.deleteFile(APPWRITE_STORAGE_BUCKET_ID, cardId);
+    } catch {
+      // Ignore if file does not exist or cannot be removed right now.
+    }
+  }, [getCurrentUser, user]);
   const syncToCloud = useCallback(async (): Promise<SyncResult> => {
     if (!ENABLE_CLOUD_SYNC) {
       return { success: false, error: 'Cloud sync is disabled.' };
@@ -385,6 +427,7 @@ export function useFlashcardSync() {
         const payload = {
           isActive: true,
           word: card.word,
+          words: card.word,
           imageUrl: card.imageUrl,
           categoryId: card.categoryId,
           createdAt: card.createdAt ?? Date.now(),
@@ -451,6 +494,7 @@ export function useFlashcardSync() {
     listAllDocuments,
     saveAllCards,
     saveAllCategories,
+    uploadImage,
     updatePendingCount,
     user,
   ]);
@@ -502,49 +546,6 @@ export function useFlashcardSync() {
       return { success: false, error: error instanceof Error ? error.message : 'Logout failed' };
     }
   }, []);
-
-  const uploadImage = useCallback(async (cardId: string, imageData: string): Promise<string | null> => {
-    await saveImage(cardId, imageData);
-
-    if (!isDataImageUrl(imageData)) {
-      return imageData;
-    }
-
-    const currentUser = user ?? (await getCurrentUser());
-    if (!currentUser) {
-      return imageData;
-    }
-
-    try {
-      const file = await dataUrlToFile(imageData, cardId);
-      const permissions = createPermissions(currentUser.$id);
-
-      try {
-        await appwriteStorage.deleteFile(APPWRITE_STORAGE_BUCKET_ID, cardId);
-      } catch {
-        // Ignore if file does not exist yet.
-      }
-
-      await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
-      return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
-    } catch (error) {
-      console.error('Image upload failed:', error);
-      return imageData;
-    }
-  }, [getCurrentUser, saveImage, user]);
-
-  const deleteImageFromCloud = useCallback(async (cardId: string): Promise<void> => {
-    const currentUser = user ?? (await getCurrentUser());
-    if (!currentUser) {
-      return;
-    }
-
-    try {
-      await appwriteStorage.deleteFile(APPWRITE_STORAGE_BUCKET_ID, cardId);
-    } catch {
-      // Ignore if file does not exist or cannot be removed right now.
-    }
-  }, [getCurrentUser, user]);
 
   useEffect(() => {
     const handleOnline = () => {
