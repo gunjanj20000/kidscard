@@ -672,13 +672,6 @@ export function useFlashcardSync() {
             realtimePullTimer.current = null;
             void pullFromCloud();
           }, 200);
-        },
-        (error) => {
-          console.warn('Realtime subscription warning:', error);
-          // Connection interrupted - fall back to periodic polling
-          if (realtimePullTimer.current !== null) {
-            window.clearTimeout(realtimePullTimer.current);
-          }
         }
       );
 
@@ -691,6 +684,7 @@ export function useFlashcardSync() {
     } catch (error) {
       console.error('Failed to establish realtime subscription:', error);
       // Realtime connection failed - app will continue with manual sync
+      return undefined;
     }
   }, [pullFromCloud, user]);
 
