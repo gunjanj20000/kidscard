@@ -548,17 +548,28 @@ export function useFlashcardSync() {
     return pullFromCloud();
   }, [pullFromCloud, syncToCloud]);
 
+  const fullSyncWithPullFirst = useCallback(async (): Promise<SyncResult> => {
+    // On login to a new device, pull cloud data FIRST to get the user's data,
+    // then push any local changes to ensure cloud is up to date
+    const pull = await pullFromCloud();
+    if (!pull.success) {
+      return pull;
+    }
+
+    return syncToCloud();
+  }, [pullFromCloud, syncToCloud]);
+
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       await account.createEmailPasswordSession(email, password);
       const currentUser = await account.get();
       setUser(currentUser);
-      await fullSync();
+      await fullSyncWithPullFirst();
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
     }
-  }, [fullSync]);
+  }, [fullSyncWithPullFirst]);
 
   const signup = useCallback(async (
     name: string,
@@ -570,6 +581,7 @@ export function useFlashcardSync() {
       await account.createEmailPasswordSession(email, password);
       const currentUser = await account.get();
       setUser(currentUser);
+      // On signup, only push local (no cloud data to pull initially)
       await fullSync();
       return { success: true };
     } catch (error) {
