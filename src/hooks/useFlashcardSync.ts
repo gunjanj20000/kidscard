@@ -455,9 +455,17 @@ export function useFlashcardSync() {
                 );
                 return;
               } catch (createError) {
+                const createErrorMsg = createError instanceof Error ? createError.message : String(createError);
+                console.error(`Create failed for ${collectionId}/${documentId}:`, {
+                  error: createErrorMsg,
+                  payload,
+                  fullError: createError,
+                });
+
                 const createUnknownAttribute = getUnknownAttribute(createError);
                 if (createUnknownAttribute && createUnknownAttribute in payload) {
                   const { [createUnknownAttribute]: _removed, ...nextPayload } = payload;
+                  console.warn(`Removing unknown attribute "${createUnknownAttribute}" and retrying...`);
                   payload = nextPayload;
                   continue;
                 }
@@ -522,6 +530,23 @@ export function useFlashcardSync() {
           imageId: card.imageUrl,
           categoryId: card.categoryId,
         };
+
+        // Validate payload before sending
+        if (!payload.word || !payload.categoryId) {
+          console.warn('⚠️ Card payload validation failed', {
+            cardId: card.id,
+            word: payload.word,
+            categoryId: payload.categoryId,
+            fullPayload: payload,
+          });
+        } else {
+          console.debug('📤 Syncing card to cloud', {
+            cardId: card.id,
+            word: payload.word,
+            categoryId: payload.categoryId,
+            imageId: payload.imageId?.substring(0, 50) + '...',
+          });
+        }
 
         await upsertDocumentWithSchemaFallback(
           APPWRITE_CARDS_COLLECTION_ID,
