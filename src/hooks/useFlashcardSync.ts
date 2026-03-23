@@ -110,14 +110,28 @@ const isQueryCompatibilityError = (error: unknown): boolean => {
 };
 
 const UNKNOWN_ATTRIBUTE_REGEX = /Unknown attribute:\s*"([^"]+)"/i;
+const INVALID_FIELD_REGEX = /Invalid field:\s*"([^"]+)"/i;
 
 const getUnknownAttribute = (error: unknown): string | null => {
   if (!(error instanceof Error)) {
     return null;
   }
 
-  const match = error.message.match(UNKNOWN_ATTRIBUTE_REGEX);
-  return match?.[1] ?? null;
+  const message = error.message;
+  
+  // Try multiple patterns for finding problematic attribute
+  let match = message.match(UNKNOWN_ATTRIBUTE_REGEX);
+  if (match?.[1]) return match[1];
+  
+  match = message.match(INVALID_FIELD_REGEX);
+  if (match?.[1]) return match[1];
+  
+  // Log the full error for debugging unknown formats
+  if (message.includes('400') || message.includes('Bad Request')) {
+    console.error('Appwrite 400 error (unparsed):', message);
+  }
+  
+  return null;
 };
 
 export function useFlashcardSync() {
@@ -395,6 +409,20 @@ export function useFlashcardSync() {
                 const { [createUnknownAttribute]: _removed, ...nextPayload } = payload;
                 payload = nextPayload;
                 continue;
+              }
+
+              // If it's still a 400 and we haven't tried stripping optional fields, try harder
+              if (createError instanceof Error && createError.message.includes('400')) {
+                // Try stripping optional fields one by one
+                const optionalFields = ['isActive', 'createdAt', 'updatedAt', 'order', 'icon'];
+                for (const field of optionalFields) {
+                  if (field in payload) {
+                    const { [field]: _removed, ...nextPayload } = payload;
+                    payload = nextPayload;
+                    attempt = attempt - 1; // Don't count this as an attempt, retry same loop
+                    continue;
+                  }
+                }
               }
 
               throw createError;
