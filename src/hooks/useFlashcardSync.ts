@@ -59,6 +59,12 @@ const dataUrlToFile = async (dataUrl: string, fileName: string): Promise<File> =
   } else if (blob.type.includes('/')) {
     extension = blob.type.split('/')[1]?.split(';')[0] || 'png';
   }
+  
+  // Normalize jpeg to jpg for better bucket compatibility
+  if (extension === 'jpeg') {
+    extension = 'jpg';
+  }
+  
   // Fallback to common extensions
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
     extension = 'png';
@@ -318,7 +324,11 @@ export function useFlashcardSync() {
       }
 
       // Log upload attempt for debugging
-      console.debug(`Uploading image: ${file.name} (${file.type}, ${file.size} bytes)`);
+      console.debug(`Uploading image: ${file.name} (${file.type}, ${Math.round(file.size / 1024)}KB)`, {
+        extension: file.name.split('.').pop(),
+        mimeType: file.type,
+        size: file.size,
+      });
 
       await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
       
@@ -326,13 +336,17 @@ export function useFlashcardSync() {
       return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('Image upload error response:', {
+        message: errorMsg,
+        fullError: error,
+      });
+      
       if (errorMsg.includes('extension') || errorMsg.includes('MIME')) {
-        console.error(
-          'Image upload blocked: Appwrite bucket rejected file. Check bucket allows jpg, png, svg extensions.',
-          error
-        );
-      } else if (errorMsg.includes('permission') || errorMsg.includes('401')) {
-        console.error('Image upload failed: Permission denied. User may not have storage access.', error);
+        console.error('Extension rejected by bucket. The bucket may have different allowed extensions than expected.');
+      } else if (errorMsg.includes('permission') || errorMsg.includes('401') || errorMsg.includes('403')) {
+        console.error('Permission denied uploading to storage.');
+      } else if (errorMsg.includes('quota') || errorMsg.includes('limit')) {
+        console.error('Storage quota or upload limit exceeded.');
       } else {
         console.error('Image upload failed:', error);
       }
