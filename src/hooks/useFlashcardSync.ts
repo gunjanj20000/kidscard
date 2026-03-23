@@ -227,9 +227,19 @@ export function useFlashcardSync() {
       let response: Models.DocumentList<T>;
       try {
         response = await databases.listDocuments<T>(APPWRITE_DATABASE_ID, collectionId, queries);
+        console.debug(`📋 listAllDocuments(${collectionId}):`, {
+          fetched: response.documents.length,
+          total: allDocs.length + response.documents.length,
+          useOwnerFilter,
+          userId,
+        });
       } catch (error) {
         if (useOwnerFilter && isQueryCompatibilityError(error)) {
           // Some Appwrite setups reject this filter when the attribute/index is missing.
+          console.warn(
+            `📋 listAllDocuments(${collectionId}): Query with ownerId filter failed, retrying without filter`,
+            error instanceof Error ? error.message : error
+          );
           useOwnerFilter = false;
           allDocs.length = 0;
           cursor = undefined;
@@ -268,21 +278,36 @@ export function useFlashcardSync() {
       return { success: false, error: 'Please log in first.' };
     }
 
+    console.debug('⬇️ pullFromCloud: Starting pull for user', { userId: currentUser.$id });
+
     setSyncState((prev) => ({ ...prev, isSyncing: true }));
 
     try {
+      console.debug('⬇️ pullFromCloud: Fetching remote cards and categories...');
       const [remoteCardDocs, remoteCategoryDocs] = await Promise.all([
         listAllDocuments<CloudCardDoc>(APPWRITE_CARDS_COLLECTION_ID, currentUser.$id),
         listAllDocuments<CloudCategoryDoc>(APPWRITE_CATEGORIES_COLLECTION_ID, currentUser.$id),
       ]);
 
+      console.debug('⬇️ pullFromCloud: Fetched from cloud', {
+        cardCount: remoteCardDocs.length,
+        categoryCount: remoteCategoryDocs.length,
+        cardIds: remoteCardDocs.map((c) => c.$id),
+      });
+
       const remoteCategories = sortCategories(remoteCategoryDocs.map(mapCategoryDocToLocal));
       const remoteCards = remoteCardDocs.map(mapCardDocToLocal);
 
+      console.debug('⬇️ pullFromCloud: Saving to local storage...');
       await Promise.all([
         saveAllCategories(remoteCategories),
         saveAllCards(remoteCards),
       ]);
+
+      console.debug('⬇️ pullFromCloud: Saved to local storage', {
+        cardCount: remoteCards.length,
+        categoryCount: remoteCategories.length,
+      });
 
       setSyncState((prev) => ({
         ...prev,
@@ -299,6 +324,7 @@ export function useFlashcardSync() {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to pull from cloud.';
+      console.error('⬇️ pullFromCloud failed:', message, error);
       setSyncState((prev) => ({ ...prev, isSyncing: false }));
       return { success: false, error: message };
     }
@@ -625,23 +651,37 @@ export function useFlashcardSync() {
   const fullSyncWithPullFirst = useCallback(async (): Promise<SyncResult> => {
     // On login to a new device, pull cloud data FIRST to get the user's data,
     // then push any local changes to ensure cloud is up to date
+    console.debug('🔄 fullSyncWithPullFirst: Starting pull...');
     const pull = await pullFromCloud();
     if (!pull.success) {
+      console.warn('🔄 fullSyncWithPullFirst: Pull failed, aborting sync', pull);
       return pull;
     }
 
+    console.debug('🔄 fullSyncWithPullFirst: Pull succeeded, now syncing to cloud...');
     return syncToCloud();
   }, [pullFromCloud, syncToCloud]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      console.debug('🔐 Login: Creating session...');
       await account.createEmailPasswordSession(email, password);
+      
+      console.debug('🔐 Login: Fetching user...');
       const currentUser = await account.get();
+      console.debug('🔐 Login: User fetched:', { userId: currentUser.$id, email: currentUser.email });
+      
       setUser(currentUser);
-      await fullSyncWithPullFirst();
+      
+      console.debug('🔐 Login: Starting fullSyncWithPullFirst...');
+      const syncResult = await fullSyncWithPullFirst();
+      console.debug('🔐 Login: Sync completed', syncResult);
+      
       return { success: true };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
+      const errorMsg = error instanceof Error ? error.message : 'Login failed';
+      console.error('🔐 Login failed:', errorMsg, error);
+      return { success: false, error: errorMsg };
     }
   }, [fullSyncWithPullFirst]);
 
