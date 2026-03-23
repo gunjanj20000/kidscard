@@ -10,6 +10,7 @@ import {
   APPWRITE_CARDS_COLLECTION_ID,
   APPWRITE_CATEGORIES_COLLECTION_ID,
   APPWRITE_STORAGE_BUCKET_ID,
+  getImagePreviewUrl,
 } from '@/lib/appwrite';
 import { useOfflineStorage } from './useOfflineStorage';
 
@@ -75,15 +76,25 @@ const dataUrlToFile = async (dataUrl: string, fileName: string): Promise<File> =
   return new File([blob], `${fileName}.${extension}`, { type: blob.type || 'image/png' });
 };
 
-const mapCardDocToLocal = (doc: CloudCardDoc): Flashcard => ({
-  id: doc.$id,
-  word: String(doc.word ?? doc.words ?? ''),
-  imageUrl: String(doc.imageUrl ?? ''),
-  categoryId: String(doc.categoryId ?? ''),
-  createdAt: typeof doc.createdAt === 'number' ? doc.createdAt : Date.now(),
-  updatedAt: typeof doc.updatedAt === 'number' ? doc.updatedAt : Date.now(),
-  syncStatus: 'synced',
-});
+const mapCardDocToLocal = (doc: CloudCardDoc): Flashcard => {
+  // Convert file ID to preview URL for display
+  let displayImageUrl = String(doc.imageUrl ?? '');
+  
+  // If imageUrl looks like a file ID (not a URL and not a data URL), convert it to preview URL
+  if (displayImageUrl && !displayImageUrl.startsWith('http') && !displayImageUrl.startsWith('data:')) {
+    displayImageUrl = getImagePreviewUrl(displayImageUrl);
+  }
+  
+  return {
+    id: doc.$id,
+    word: String(doc.word ?? doc.words ?? ''),
+    imageUrl: displayImageUrl,
+    categoryId: String(doc.categoryId ?? ''),
+    createdAt: typeof doc.createdAt === 'number' ? doc.createdAt : Date.now(),
+    updatedAt: typeof doc.updatedAt === 'number' ? doc.updatedAt : Date.now(),
+    syncStatus: 'synced',
+  };
+};
 
 const mapCategoryDocToLocal = (doc: CloudCategoryDoc): Category => {
   const color = String(doc.color ?? 'coral') as Category['color'];
@@ -359,12 +370,14 @@ export function useFlashcardSync() {
         mimeType: file.type,
         sizeKB: Math.round(file.size / 1024),
         bucketId: APPWRITE_STORAGE_BUCKET_ID,
+        fileIdForDatabase: cardId,
       });
 
       await appwriteStorage.createFile(APPWRITE_STORAGE_BUCKET_ID, cardId, file, permissions);
       
       console.debug(`✓ Image uploaded successfully: ${file.name}`);
-      return appwriteStorage.getFilePreview(APPWRITE_STORAGE_BUCKET_ID, cardId).toString();
+      // Return just the file ID for the database, not the preview URL
+      return cardId;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Image upload failed', {
