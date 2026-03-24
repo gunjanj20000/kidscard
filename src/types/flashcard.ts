@@ -18,6 +18,7 @@ export interface Category {
   createdAt?: number;
   updatedAt?: number;
   syncStatus?: 'synced' | 'pending' | 'conflict';
+  isDefault?: boolean;
 }
 
 export interface AppSettings {

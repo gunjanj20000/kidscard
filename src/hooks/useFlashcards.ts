@@ -244,41 +244,52 @@ export function useFlashcards() {
   const addCard = useCallback(async (card: Omit<Flashcard, 'id'>) => {
     const now = Date.now();
     const cardId = generateClientId('card');
-    let imageUrl = card.imageUrl;
     
-    if (ENABLE_CLOUD_SYNC && sync.isEnabled && sync.syncState.isOnline) {
-      const uploadedUrl = await sync.uploadImage(cardId, card.imageUrl);
-      if (uploadedUrl) {
-        imageUrl = uploadedUrl;
-        console.debug('✓ Image uploaded for card:', { cardId, imageUrl: imageUrl.substring(0, 50) });
-      } else {
-        console.warn('⚠️ Image upload returned null, using original imageUrl:', {
-          cardId,
-          isDataUrl: card.imageUrl.startsWith('data:'),
-        });
-      }
-    }
-
     const newCard: Flashcard = {
       ...card,
       id: cardId,
-      imageUrl,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'pending',
+      syncStatus: ENABLE_CLOUD_SYNC ? 'pending' : 'local',
     };
     
     const updatedCards = [...cards, newCard];
+    
+    // 1. Add card to local state immediately (card appears instantly in app)
     setCards(updatedCards);
     
-    // Save to IndexedDB (non-blocking for UI)
-    storage.saveAllCards(updatedCards).then(() => {
+    // 2. Save to IndexedDB immediately (persists locally)
+    await storage.saveAllCards(updatedCards);
+    
+    // 3. Background: Upload image and sync to cloud (happens after card is visible)
+    if (ENABLE_CLOUD_SYNC && sync.isEnabled) {
+      // Non-blocking background operations
+      Promise.resolve().then(async () => {
+        try {
+          if (card.imageUrl.startsWith('data:')) {
+            const uploadedUrl = await sync.uploadImage(cardId, card.imageUrl);
+            if (uploadedUrl) {
+              console.debug('✓ Image uploaded for card:', { cardId, uploadedImageUrl: uploadedUrl.substring(0, 50) });
+              // Update card with uploaded URL
+              const updatedCard = { ...newCard, imageUrl: uploadedUrl, updatedAt: Date.now() };
+              setCards((prevCards) => prevCards.map((c) => (c.id === cardId ? updatedCard : c)));
+              // Get current cards from storage, update the one we just uploaded
+              const allCurrentCards = await storage.getAllCards();
+              const updatedAllCards = allCurrentCards.map((c) => (c.id === cardId ? updatedCard : c));
+              await storage.saveAllCards(updatedAllCards);
+            }
+          }
+          sync.updatePendingCount();
+          // Trigger background sync
+          scheduleCloudSync();
+        } catch (error) {
+          console.error('⚠️ Background image upload failed:', { cardId, error });
+          // Card is still visible locally even if upload fails
+        }
+      });
+    } else {
       sync.updatePendingCount();
-      // Trigger background sync if enabled
-      if (ENABLE_CLOUD_SYNC && sync.syncState.isOnline) {
-        scheduleCloudSync();
-      }
-    });
+    }
     
     return newCard;
   }, [cards, storage, sync, scheduleCloudSync]);

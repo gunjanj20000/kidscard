@@ -126,6 +126,7 @@ const withStoreRecovery = async <T>(operation: () => Promise<T>): Promise<T> => 
      createdAt: now + index,
      updatedAt: now + index,
      syncStatus: 'pending',
+     isDefault: true,
    }));
  };
  

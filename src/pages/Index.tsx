@@ -289,11 +289,13 @@ const Index = () => {
             {/* Category Grid */}
             <DndContext sensors={sensors} onDragEnd={handleCategoryDragEnd}>
               <SortableContext
-                items={sortedCategories.map((category) => category.id)}
+                items={sortedCategories.filter((cat) => !cat.isDefault).map((category) => category.id)}
                 strategy={rectSortingStrategy}
               >
                 <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 flex-1 min-h-0 auto-rows-fr overflow-hidden">
-                  {sortedCategories.map((category, index) => (
+                  {sortedCategories
+                    .filter((cat) => !cat.isDefault)
+                    .map((category, index) => (
                     <SortableCategoryItem
                       key={category.id}
                       category={category}
