@@ -36,7 +36,7 @@ export function CategoryCard({ category, cardCount, onClick }: CategoryCardProps
     >
       <span className="text-4xl md:text-5xl mb-2">{category.icon}</span>
       <span className="text-sm md:text-lg font-bold text-foreground/90 text-center leading-tight">
-        {category.name}
+        {category.name.toUpperCase()}
       </span>
       <span className="text-xs md:text-sm font-semibold text-foreground/60 mt-0.5">
         {cardCount} {cardCount === 1 ? 'card' : 'cards'}

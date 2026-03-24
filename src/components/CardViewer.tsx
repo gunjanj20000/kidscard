@@ -240,7 +240,7 @@ export function CardViewer({ category, cards, settings, onBack, onAddCard, allCa
                 whileTap={{ scale: 0.97 }}
               >
                 <span className="text-2xl">{category.icon}</span>
-                <span className="font-bold text-lg">{category.name}</span>
+                <span className="font-bold text-lg">{category.name.toUpperCase()}</span>
                 <ChevronDown className="w-5 h-5 text-muted-foreground" />
               </motion.button>
             </DropdownMenuTrigger>
@@ -267,7 +267,7 @@ export function CardViewer({ category, cards, settings, onBack, onAddCard, allCa
         ) : (
           <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-2xl card-shadow">
             <span className="text-2xl">{category.icon}</span>
-            <span className="font-bold text-lg">{category.name}</span>
+            <span className="font-bold text-lg">{category.name.toUpperCase()}</span>
           </div>
         )}
 

@@ -109,6 +109,12 @@ const withStoreRecovery = async <T>(operation: () => Promise<T>): Promise<T> => 
      { name: 'Food', icon: '🍎', color: 'sunshine' },
      { name: 'Shapes', icon: '⭐', color: 'lavender' },
      { name: 'Nature', icon: '🌸', color: 'peach' },
+     { name: 'Vehicles', icon: '🚗', color: 'coral' },
+     { name: 'Sports', icon: '⚽', color: 'sky' },
+     { name: 'Weather', icon: '☀️', color: 'mint' },
+     { name: 'Body Parts', icon: '👁️', color: 'sunshine' },
+     { name: 'Emotions', icon: '😊', color: 'lavender' },
+     { name: 'Toys', icon: '🎮', color: 'peach' },
    ];
 
    return templates.map((item, index) => ({

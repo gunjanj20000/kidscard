@@ -228,7 +228,7 @@ export function FlashCard({ card, onSpeak, onSwipeLeft, onSwipeRight, isFirst = 
         {/* Word Section */}
         <div className="flashcard-word py-8 px-6 bg-gradient-to-t from-primary/20 to-transparent">
           <h2 className="text-4xl md:text-5xl font-extrabold text-center text-foreground break-words">
-            {card.word}
+            {card.word.toUpperCase()}
           </h2>
         </div>
       </div>

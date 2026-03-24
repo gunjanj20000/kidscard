@@ -503,9 +503,9 @@ export function SettingsPage({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-lg truncate">
-                      {card.word}{' '}
+                      {card.word.toUpperCase()}{' '}
                       <span className="text-xs font-medium text-muted-foreground normal-case">
-                        ({(category?.name ?? 'uncategorized').toLowerCase()})
+                        ({(category?.name ?? 'uncategorized').toUpperCase()})
                       </span>
                     </p>
                   </div>
@@ -691,7 +691,7 @@ export function SettingsPage({
                     {category.icon}
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-lg">{category.name}</p>
+                    <p className="font-bold text-lg">{category.name.toUpperCase()}</p>
                     <p className="text-sm text-muted-foreground">
                       {getCardCountForCategory(category.id)} cards
                     </p>

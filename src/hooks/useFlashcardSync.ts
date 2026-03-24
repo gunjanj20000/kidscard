@@ -571,6 +571,27 @@ export function useFlashcardSync() {
       }));
 
       await Promise.all(effectiveLocalCards.map(async (card) => {
+        // Validate that card has required fields including imageUrl
+        // imageUrl must be a file ID (UUID format) or a preview URL, NOT a data URL
+        if (!card.word || !card.categoryId || !card.imageUrl) {
+          console.warn('⚠️ Card validation failed - missing required fields', {
+            cardId: card.id,
+            word: card.word,
+            categoryId: card.categoryId,
+            hasImageUrl: !!card.imageUrl,
+          });
+          return; // Skip this card
+        }
+
+        // Check if imageUrl is a data URL (still local, not uploaded)
+        if (card.imageUrl.startsWith('data:')) {
+          console.warn('⚠️ Card has local data URL, not uploaded yet', {
+            cardId: card.id,
+            word: card.word,
+          });
+          return; // Skip this card - image hasn't been uploaded to cloud yet
+        }
+
         const payload = {
           ownerId: currentUser.$id,
           word: card.word,
@@ -580,22 +601,12 @@ export function useFlashcardSync() {
           updatedAt: card.updatedAt ?? Date.now(),
         };
 
-        // Validate payload before sending
-        if (!payload.word || !payload.categoryId) {
-          console.warn('⚠️ Card payload validation failed', {
-            cardId: card.id,
-            word: payload.word,
-            categoryId: payload.categoryId,
-            fullPayload: payload,
-          });
-        } else {
-          console.debug('📤 Syncing card to cloud', {
-            cardId: card.id,
-            word: payload.word,
-            categoryId: payload.categoryId,
-            imageUrl: payload.imageUrl?.substring(0, 50) + '...',
-          });
-        }
+        console.debug('📤 Syncing card to cloud', {
+          cardId: card.id,
+          word: payload.word,
+          categoryId: payload.categoryId,
+          imageUrl: payload.imageUrl?.substring(0, 50) + '...',
+        });
 
         await upsertDocumentWithSchemaFallback(
           APPWRITE_CARDS_COLLECTION_ID,
