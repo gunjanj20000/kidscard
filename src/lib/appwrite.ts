@@ -18,12 +18,12 @@ const storage = new Storage(client);
 /**
  * Convert a file ID to its view/preview URL
  * Used for displaying images that are stored in Appwrite buckets
- * Uses the preview endpoint which has better CORS support on mobile
+ * Uses the view endpoint for reliable image display across all platforms
  */
 const getImagePreviewUrl = (fileId: string): string => {
-  // Use preview endpoint with proper CORS and mode parameters
-  // ?width=400&height=400 for reasonable image sizes
-  return `${APPWRITE_ENDPOINT}/storage/buckets/${APPWRITE_STORAGE_BUCKET_ID}/files/${fileId}/preview?project=${APPWRITE_PROJECT_ID}&width=800&height=800&quality=90`;
+  // Use view endpoint which is more reliable
+  // mode=admin allows unauthenticated access if bucket permissions permit
+  return `${APPWRITE_ENDPOINT}/storage/buckets/${APPWRITE_STORAGE_BUCKET_ID}/files/${fileId}/view?project=${APPWRITE_PROJECT_ID}&mode=admin`;
 };
 
 export {
