@@ -94,6 +94,13 @@ export function CardViewer({ category, cards, settings, onBack, onAddCard, allCa
     };
   }, [currentCard, settings.autoPlayAudio, settings.repeatAudio, speak]);
 
+  // Auto-scroll to newest card when a new card is added
+  useEffect(() => {
+    if (cards.length > 0 && currentIndex !== cards.length - 1) {
+      setCurrentIndex(cards.length - 1);
+    }
+  }, [cards.length]);
+
   const goNext = () => {
     if (currentIndex < cards.length - 1) {
       triggerHaptic(20);

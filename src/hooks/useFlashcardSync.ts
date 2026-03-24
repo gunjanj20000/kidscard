@@ -807,23 +807,6 @@ export function useFlashcardSync() {
     }
   }, [pullFromCloud, user]);
 
-  // Auto-sync from cloud when app starts with user already logged in
-  useEffect(() => {
-    if (!ENABLE_CLOUD_SYNC || !user || syncState.isSyncing) {
-      return;
-    }
-
-    // Only auto-sync if it's been a while since last sync or never synced
-    const timeSinceLastSync = syncState.lastSyncedAt ? Date.now() - syncState.lastSyncedAt : Infinity;
-    const shouldAutoSync = timeSinceLastSync > 60000; // Auto-sync if last sync was >1 min ago
-
-    if (shouldAutoSync) {
-      console.debug('🔄 Auto-syncing from cloud on app startup...');
-      // Pull from cloud to get latest cards
-      void pullFromCloud();
-    }
-  }, [user, syncState.isSyncing, syncState.lastSyncedAt, pullFromCloud]);
-
   return {
     syncState,
     syncToCloud,
