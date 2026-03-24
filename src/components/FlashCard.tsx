@@ -194,6 +194,7 @@ export function FlashCard({ card, onSpeak, onSwipeLeft, onSwipeRight, isFirst = 
             <img
               src={card.imageUrl}
               alt={card.word}
+              crossOrigin="anonymous"
               className="w-full h-full object-contain"
               loading="eager"
               onError={(e) => {

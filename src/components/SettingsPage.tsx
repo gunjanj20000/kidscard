@@ -499,7 +499,7 @@ export function SettingsPage({
               return (
                 <Card key={card.id} className="p-3 rounded-2xl flex items-center gap-3">
                   <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 flex-shrink-0 flex items-center justify-center">
-                    <img src={card.imageUrl} alt={card.word} className="w-full h-full object-contain" />
+                    <img src={card.imageUrl} alt={card.word} crossOrigin="anonymous" className="w-full h-full object-contain" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-lg truncate">
