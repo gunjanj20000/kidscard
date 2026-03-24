@@ -185,28 +185,35 @@ export function FlashCard({ card, onSpeak, onSwipeLeft, onSwipeRight, isFirst = 
       <div className="flashcard-content relative h-full w-full bg-card rounded-3xl card-shadow overflow-hidden flex flex-col">
         {/* Image Section */}
         <div className={`flashcard-image flex-1 relative overflow-hidden bg-gradient-to-br ${bgGradient} flex items-center justify-center`}>
-          <img
-            src={card.imageUrl}
-            alt={card.word}
-            className="w-full h-full object-contain"
-            loading="eager"
-            onError={(e) => {
-              console.error('Failed to load image for card:', {
-                cardId: card.id,
-                word: card.word,
-                imageUrl: card.imageUrl,
-                error: e,
-              });
-              // Image failed to load, will show gradient background
-            }}
-            onLoad={() => {
-              console.debug('Image loaded successfully for card:', {
-                cardId: card.id,
-                word: card.word,
-                imageUrl: card.imageUrl?.substring(0, 100),
-              });
-            }}
-          />
+          {!card.imageUrl ? (
+            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <div className="text-4xl">🖼️</div>
+              <p className="text-sm font-medium">No image</p>
+            </div>
+          ) : (
+            <img
+              src={card.imageUrl}
+              alt={card.word}
+              className="w-full h-full object-contain"
+              loading="eager"
+              onError={(e) => {
+                console.error('Failed to load image for card:', {
+                  cardId: card.id,
+                  word: card.word,
+                  imageUrl: card.imageUrl,
+                  error: e,
+                });
+                // Image failed to load, will show gradient background
+              }}
+              onLoad={() => {
+                console.debug('Image loaded successfully for card:', {
+                  cardId: card.id,
+                  word: card.word,
+                  imageUrl: card.imageUrl?.substring(0, 100),
+                });
+              }}
+            />
+          )}
           
           {/* Sound indicator */}
           <motion.div

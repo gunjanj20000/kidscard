@@ -245,10 +245,17 @@ export function useFlashcards() {
     const now = Date.now();
     const cardId = generateClientId('card');
     let imageUrl = card.imageUrl;
+    
     if (ENABLE_CLOUD_SYNC && sync.isEnabled && sync.syncState.isOnline) {
       const uploadedUrl = await sync.uploadImage(cardId, card.imageUrl);
       if (uploadedUrl) {
         imageUrl = uploadedUrl;
+        console.debug('✓ Image uploaded for card:', { cardId, imageUrl: imageUrl.substring(0, 50) });
+      } else {
+        console.warn('⚠️ Image upload returned null, using original imageUrl:', {
+          cardId,
+          isDataUrl: card.imageUrl.startsWith('data:'),
+        });
       }
     }
 
@@ -282,6 +289,11 @@ export function useFlashcards() {
       const uploadedUrl = await sync.uploadImage(id, nextImageUrl);
       if (uploadedUrl) {
         nextImageUrl = uploadedUrl;
+      } else {
+        console.warn('⚠️ Image upload failed for card update:', {
+          cardId: id,
+          isDataUrl: nextImageUrl.startsWith('data:'),
+        });
       }
     }
 
