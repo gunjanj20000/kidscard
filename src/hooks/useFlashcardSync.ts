@@ -558,6 +558,9 @@ export function useFlashcardSync() {
           name: category.name,
           icon: category.icon,
           color: category.color,
+          order: category.order ?? 0,
+          createdAt: category.createdAt ?? Date.now(),
+          updatedAt: category.updatedAt ?? Date.now(),
         };
 
         await upsertDocumentWithSchemaFallback(
@@ -571,8 +574,10 @@ export function useFlashcardSync() {
         const payload = {
           ownerId: currentUser.$id,
           word: card.word,
-          imageId: card.imageUrl,
+          imageUrl: card.imageUrl,
           categoryId: card.categoryId,
+          createdAt: card.createdAt ?? Date.now(),
+          updatedAt: card.updatedAt ?? Date.now(),
         };
 
         // Validate payload before sending
@@ -588,7 +593,7 @@ export function useFlashcardSync() {
             cardId: card.id,
             word: payload.word,
             categoryId: payload.categoryId,
-            imageId: payload.imageId?.substring(0, 50) + '...',
+            imageUrl: payload.imageUrl?.substring(0, 50) + '...',
           });
         }
 

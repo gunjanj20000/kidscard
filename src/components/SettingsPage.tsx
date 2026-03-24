@@ -297,19 +297,6 @@ export function SettingsPage({
     toast.success('Logged out successfully');
   };
 
-  const handleSyncNow = async () => {
-    setIsAuthBusy(true);
-    const result = await onSyncNow();
-    setIsAuthBusy(false);
-
-    if (!result.success) {
-      toast.error(result.error ?? 'Sync failed');
-      return;
-    }
-
-    toast.success(`Synced ${result.syncedCards ?? 0} cards and ${result.syncedCategories ?? 0} categories`);
-  };
-
   return (
     <div className="h-[100dvh] bg-background p-4 pb-4 overflow-hidden flex flex-col">
       {/* Header */}
@@ -934,14 +921,9 @@ export function SettingsPage({
             )}
 
             {currentUser && (
-              <div className="grid grid-cols-2 gap-2">
-                <Button onClick={handleSyncNow} className="h-11 rounded-xl font-semibold" disabled={isAuthBusy}>
-                  Sync now
-                </Button>
-                <Button variant="outline" onClick={handleLogout} className="h-11 rounded-xl font-semibold" disabled={isAuthBusy}>
-                  Logout
-                </Button>
-              </div>
+              <Button variant="outline" onClick={handleLogout} className="w-full h-11 rounded-xl font-semibold" disabled={isAuthBusy}>
+                Logout
+              </Button>
             )}
           </Card>
         </div>
