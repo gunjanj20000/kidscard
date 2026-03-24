@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Flashcard, Category, AppSettings } from '@/types/flashcard';
 import { useOfflineStorage } from './useOfflineStorage';
 import { useFlashcardSync, ENABLE_CLOUD_SYNC } from './useFlashcardSync';
+import { getImagePreviewUrl } from '@/lib/appwrite';
 import { toast } from 'sonner';
 
 const generateClientId = (prefix: 'card' | 'cat') => {
@@ -267,11 +268,17 @@ export function useFlashcards() {
       Promise.resolve().then(async () => {
         try {
           if (card.imageUrl.startsWith('data:')) {
-            const uploadedUrl = await sync.uploadImage(cardId, card.imageUrl);
-            if (uploadedUrl) {
-              console.debug('✓ Image uploaded for card:', { cardId, uploadedImageUrl: uploadedUrl.substring(0, 50) });
-              // Update card with uploaded URL
-              const updatedCard = { ...newCard, imageUrl: uploadedUrl, updatedAt: Date.now() };
+            const uploadedFileId = await sync.uploadImage(cardId, card.imageUrl);
+            if (uploadedFileId) {
+              // Convert file ID to preview URL for display and storage
+              const previewUrl = getImagePreviewUrl(uploadedFileId);
+              console.debug('✓ Image uploaded and converted to preview URL:', { 
+                cardId, 
+                fileId: uploadedFileId,
+                previewUrl: previewUrl.substring(0, 80),
+              });
+              // Update card with preview URL
+              const updatedCard = { ...newCard, imageUrl: previewUrl, updatedAt: Date.now() };
               setCards((prevCards) => prevCards.map((c) => (c.id === cardId ? updatedCard : c)));
               // Get current cards from storage, update the one we just uploaded
               const allCurrentCards = await storage.getAllCards();

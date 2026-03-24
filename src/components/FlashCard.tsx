@@ -4,6 +4,26 @@ import { useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Volume2 } from 'lucide-react';
 import type { Flashcard } from '@/types/flashcard';
 import { useHaptics } from '@/hooks/useHaptics';
+import { getImagePreviewUrl } from '@/lib/appwrite';
+
+// Helper to ensure imageUrl is a valid URL, not just a file ID
+const ensureValidImageUrl = (imageUrl: string): string => {
+  if (!imageUrl) return imageUrl;
+  // If it's already a full URL, return as-is
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+  // If it's a data URL, return as-is
+  if (imageUrl.startsWith('data:')) {
+    return imageUrl;
+  }
+  // If it looks like a UUID/file ID, convert to preview URL
+  if (/^[a-f0-9\-]{36}$/.test(imageUrl)) {
+    return getImagePreviewUrl(imageUrl);
+  }
+  // Return as-is if unsure
+  return imageUrl;
+};
 
 interface FlashCardProps {
   card: Flashcard;
@@ -192,7 +212,7 @@ export function FlashCard({ card, onSpeak, onSwipeLeft, onSwipeRight, isFirst = 
             </div>
           ) : (
             <img
-              src={card.imageUrl}
+              src={ensureValidImageUrl(card.imageUrl)}
               alt={card.word}
               crossOrigin="anonymous"
               className="w-full h-full object-contain"
@@ -202,6 +222,7 @@ export function FlashCard({ card, onSpeak, onSwipeLeft, onSwipeRight, isFirst = 
                   cardId: card.id,
                   word: card.word,
                   imageUrl: card.imageUrl,
+                  convertedUrl: ensureValidImageUrl(card.imageUrl),
                   error: e,
                 });
                 // Image failed to load, will show gradient background

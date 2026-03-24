@@ -601,6 +601,15 @@ export function useFlashcardSync() {
           updatedAt: card.updatedAt ?? Date.now(),
         };
 
+        // Validate imageUrl is not a data URL before syncing
+        if (isDataImageUrl(String(payload.imageUrl))) {
+          console.warn('⚠️ Card has local data URL, skipping sync until image uploads', {
+            cardId: card.id,
+            word: card.word,
+          });
+          return; // Skip this card - image hasn't been properly uploaded yet
+        }
+
         console.debug('📤 Syncing card to cloud', {
           cardId: card.id,
           word: payload.word,
